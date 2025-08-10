@@ -1,0 +1,101 @@
+PFT Interpretation System
+
+Automated Preliminary Reporting for Pulmonary Function Tests
+
+This project is a clinical-grade, rules-based expert system designed to automate the generation of preliminary reports for Pulmonary Function Tests (PFTs). It addresses the significant challenge of long turnaround times and high specialist workload in hospitals by providing fast, accurate, and reliable interpretations.
+
+The system is delivered as an interactive web application, allowing clinicians to enter raw PFT data and receive a comprehensive, structured report in seconds.
+
+Project Purpose
+
+In many hospitals, the manual interpretation of PFT results by pulmonologists is a bottleneck. This process is time-consuming and dependent on specialist availability. This tool was built to solve that problem by:
+
+Reducing Workload: Transforming a 15-minute analysis and documentation task into a 1-minute data entry and review process.
+
+Improving Turnaround Time: Providing instant preliminary reports, allowing for faster clinical decision-making.
+
+Standardizing Reports: Ensuring every report is clear, structured, and consistent.
+
+Maintaining Clinical Trust: Using a transparent, rules-based engine that is directly aligned with established medical guidelines (GLI-2012, ATS/ERS).
+
+ Key Features
+
+Rules-Based Interpretation: Implements core logic from the GLI-2012 guidelines to determine patterns (Obstructive, Restrictive, Mixed, Normal) and severity.
+
+Diagnostic Confidence Score: Provides a unique, case-specific confidence percentage that indicates the clarity of the data, helping doctors identify borderline cases that require closer review.
+
+Interactive Web Interface: A clean, simple web UI built with FastAPI and HTMX allows for easy data entry and real-time report generation without page reloads.
+
+Client-Side PDF Export: An "Export as PDF" feature uses the html2pdf.js library to generate a PDF of the on-screen report directly in the user's browser.
+
+Client-Side Persistence: Uses browser Local Storage to save form data, so clinicians don't have to re-enter values on a page refresh.
+
+Built-in Validation Logic: Includes robust server-side validation to reject physiologically impossible data (e.g., FEV1 > FVC), ensuring data integrity.
+
+Comprehensive Validation Framework: Includes a standalone script (validation/validate_system.py) to test the engine's accuracy against a large, expert-annotated dataset.
+
+ Tech Stack
+Area	Technology	Purpose
+Backend	Python 3.10+	Core programming language.
+	FastAPI	High-performance web framework for the API and serving pages.
+	Uvicorn	ASGI server to run the FastAPI application.
+	Jinja2	Templating engine for rendering HTML.
+Frontend	HTML5 / CSS3	Standard for web content and styling.
+	Pico.css	A minimalist, class-less CSS framework for clean styling.
+	HTMX	Enables modern, dynamic UI features without complex JavaScript.
+	JavaScript	For client-side logic (local storage, PDF triggering).
+	html2pdf.js	A client-side library for generating PDFs from HTML content.
+
+ Project Structure
+
+PFT-test/
+├── api/
+│   └── api_server.py        # FastAPI server: serves web pages and handles form submissions.
+├── PFT-data/
+│   └── PFT_data.json        # The large dataset of PFT records used for validation.
+├── modules/
+│   ├── PFT_interpreter.py   # The "brain": contains all clinical rules and calculations.
+│   ├── PFT_main.py          # The orchestrator for batch processing and CLI.
+│   └── PFT_report.py        # The "voice": formats data into a structured report object.
+├── templates/
+│   ├── index.html           # Main UI page with the data entry form and core JavaScript.
+│   └── results_partial.html # HTMX fragment for the on-screen report layout.
+└── validation/
+    └── validate_system.py   # Script to test the interpreter's accuracy against the dataset.
+🚀 How to Use the Application
+
+Start the Server: Launch the FastAPI application using a command like uvicorn api.api_server:app --reload.
+
+Access the Tool: Open a web browser and navigate to the provided local server address (e.g., http://127.0.0.1:8000).
+
+Enter Data: The main screen presents a clean form. A clinician enters the patient's demographics and the pre- and post-bronchodilator PFT values from a standard machine printout.
+
+Generate Report: Clicking "Generate Report" sends the data to the backend. The results appear on the same page instantly, without a full refresh.
+
+Export PDF: An "Export as PDF" button appears with the report. Clicking it generates a PDF of the on-screen results for saving or printing.
+
+How It Works: System Architecture
+
+The system is designed with a clear separation of concerns:
+
+Data Entry (The Frontend): The index.html page captures raw PFT data. HTMX sends this data to the FastAPI backend.
+
+API Server (api_server.py): This is the central hub. It receives the form data, validates it, and passes it to the PFTSystem for processing.
+
+Interpretation Engine (PFT_interpreter.py): This is the core logic. It takes the clean data and:
+
+Calculates predicted values based on GLI-2012 standards.
+
+Determines Z-scores to measure deviation from the norm.
+
+Applies a series of rules to determine the Pattern, Severity, and Bronchodilator Response.
+
+Calculates the Confidence Score based on the ambiguity of the data.
+
+Report Generation (PFT_report.py): This module takes the raw interpretation results (e.g., Pattern.OBSTRUCTIVE) and formats them into a comprehensive, structured dictionary containing professional clinical language.
+
+Display & Export:
+
+The api_server.py uses the report dictionary to render the results_partial.html template for on-screen display.
+
+The index.html file contains the JavaScript that enables the "Export as PDF" button, using the html2pdf.js library to convert the on-screen report into a downloadable file.

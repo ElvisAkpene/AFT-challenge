@@ -1,0 +1,83 @@
+{% if error %}
+    <hgroup>
+        <h4 style="color: var(--pico-color-red-500);">Error Generating Report</h4>
+        <p>{{ error }}</p>
+    </hgroup>
+{% else %}
+    <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3>Generated Report</h3>
+            <button id="export-pdf-btn" class="outline">Export as PDF</button>
+        </div>
+
+        <article id="full-report" style="border: 1px solid var(--muted-border-color); padding: 1.5rem;">
+            
+            <header style="text-align: center; border-bottom: 1px solid var(--muted-border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                <hgroup>
+                    <h2>Pulmonary Function Test - Preliminary Report</h2>
+                    <p>Generated: {{ report.report_metadata.report_generated.split('T')[0] }}</p>
+                </hgroup>
+            </header>
+
+            <section id="data-section">
+                <h4>1. Patient & Test Data</h4>
+                <table>
+                    <tbody>
+                        <tr><td><strong>Age</strong></td><td>{{ report.patient_demographics.age }}</td></tr>
+                        <tr><td><strong>Sex</strong></td><td>{{ report.patient_demographics.sex }}</td></tr>
+                        <tr><td><strong>Height</strong></td><td>{{ report.patient_demographics.height }}</td></tr>
+                        <tr><td><strong>Weight</strong></td><td>{{ report.patient_demographics.weight }}</td></tr>
+                        <tr><td colspan="2"><hr style="margin: 0.5rem 0;"></td></tr>
+                        <tr><td><strong>Pre-BD FVC (Liters / % Pred)</strong></td><td>{{ report.test_results.pre_bronchodilator.fvc.measured }} / {{ report.test_results.pre_bronchodilator.fvc.percent_predicted }}</td></tr>
+                        <tr><td><strong>Pre-BD FEV1 (Liters / % Pred)</strong></td><td>{{ report.test_results.pre_bronchodilator.fev1.measured }} / {{ report.test_results.pre_bronchodilator.fev1.percent_predicted }}</td></tr>
+                        <tr><td><strong>Pre-BD FEV1/FVC Ratio</strong></td><td>{{ report.test_results.pre_bronchodilator.fev1_fvc_ratio.measured }}</td></tr>
+                        <tr><td colspan="2"><hr style="margin: 0.5rem 0;"></td></tr>
+                        <tr><td><strong>Post-BD FVC (Liters / % Pred)</strong></td><td>{{ report.test_results.post_bronchodilator.fvc.measured }} / {{ report.test_results.post_bronchodilator.fvc.percent_predicted }}</td></tr>
+                        <tr><td><strong>Post-BD FEV1 (Liters / % Pred)</strong></td><td>{{ report.test_results.post_bronchodilator.fev1.measured }} / {{ report.test_results.post_bronchodilator.fev1.percent_predicted }}</td></tr>
+                        <tr><td><strong>Post-BD FEV1/FVC Ratio</strong></td><td>{{ report.test_results.post_bronchodilator.fev1_fvc_ratio.measured }}</td></tr>
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="diagnosis-section" style="margin-top: 2rem;">
+                <h4>2. Diagnosis</h4>
+                <p><strong>Clinical Impression:</strong><br>
+                {{ report.clinical_impression.primary_impression }}</p>
+                
+                <table role="presentation" style="border: none; background: transparent; margin-top: 1rem;">
+                    <tbody>
+                        <tr>
+                            <td style="padding: 0.5rem 1rem 0.5rem 0;"><strong>Pattern:</strong></td>
+                            <td style="padding: 0.5rem 0;">{{ report.interpretation_summary.ventilatory_pattern }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 0.5rem 1rem 0.5rem 0;"><strong>Severity:</strong></td>
+                            <td style="padding: 0.5rem 0;">{{ report.interpretation_summary.overall_severity }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 0.5rem 1rem 0.5rem 0;"><strong>BD Response:</strong></td>
+                            <td style="padding: 0.5rem 0;">{{ report.interpretation_summary.bronchodilator_response }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 0.5rem 1rem 0.5rem 0;"><strong>Confidence:</strong></td>
+                            <td style="padding: 0.5rem 0;">{{ report.interpretation_summary.confidence_indicator }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="recommendations-section" style="margin-top: 2rem;">
+                <h4>3. Recommendations</h4>
+                <ul>
+                    {% for rec in report.recommendations.immediate_actions %}<li>{{ rec }}</li>{% endfor %}
+                    {% for rec in report.recommendations.follow_up %}<li>{{ rec }}</li>{% endfor %}
+                    {% for rec in report.recommendations.additional_testing %}<li>{{ rec }}</li>{% endfor %}
+                </ul>
+            </section>
+
+            <footer style="text-align: center; padding-top: 2rem;">
+                <small>This is an automated preliminary interpretation. Final clinical correlation must be performed by a qualified physician.</small>
+            </footer>
+        </article>
+    </div>
+{% endif %}

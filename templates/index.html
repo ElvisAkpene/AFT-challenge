@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PFT Preliminary Interpretation</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+        body { padding-top: 2rem; }
+        .htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }
+        .htmx-request .htmx-indicator { opacity: 1; }
+        #results-container { margin-top: 2rem; }
+        .form-buttons { display: flex; gap: 1rem; }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header>
+            <h1>PFT Preliminary Interpretation Tool</h1>
+            <p>Enter patient data to generate an automated preliminary report.</p>
+        </header>
+
+        <form 
+            id="pft-form"
+            hx-post="/interpret-form" 
+            hx-target="#results-container" 
+            hx-swap="innerHTML"
+            hx-indicator="#loading-spinner">
+
+            <div class="grid">
+                <fieldset>
+                    <legend><strong>Patient Demographics</strong></legend>
+                    <label for="age">Age (years)</label>
+                    <input type="number" id="age" name="age" required>
+                    <label for="sex">Sex</label>
+                    <select id="sex" name="sex" required><option value="" disabled selected>Select...</option><option value="M">Male</option><option value="F">Female</option></select>
+                    <label for="height_cm">Height (cm)</label>
+                    <input type="number" step="0.1" id="height_cm" name="height_cm" required>
+                    <label for="weight_kg">Weight (kg)</label>
+                    <input type="number" step="0.1" id="weight_kg" name="weight_kg" required>
+                </fieldset>
+                <fieldset>
+                    <legend><strong>Pre-Bronchodilator</strong></legend>
+                    <label for="pre_fvc_liters">FVC (Liters)</label>
+                    <input type="number" step="0.01" name="pre_fvc_liters" required>
+                    <label for="pre_fvc_pp">FVC (% Predicted)</label>
+                    <input type="number" name="pre_fvc_pp" required>
+                    <label for="pre_fev1_liters">FEV1 (Liters)</label>
+                    <input type="number" step="0.01" name="pre_fev1_liters" required>
+                    <label for="pre_fev1_pp">FEV1 (% Predicted)</label>
+                    <input type="number" name="pre_fev1_pp" required>
+                    <label for="pre_ratio">FEV1/FVC Ratio (%)</label>
+                    <input type="number" name="pre_ratio" required>
+                </fieldset>
+                <fieldset>
+                    <legend><strong>Post-Bronchodilator</strong></legend>
+                    <label for="post_fvc_liters">FVC (Liters)</label>
+                    <input type="number" step="0.01" name="post_fvc_liters" required>
+                    <label for="post_fvc_pp">FVC (% Predicted)</label>
+                    <input type="number" name="post_fvc_pp" required>
+                    <label for="post_fev1_liters">FEV1 (Liters)</label>
+                    <input type="number" step="0.01" name="post_fev1_liters" required>
+                    <label for="post_fev1_pp">FEV1 (% Predicted)</label>
+                    <input type="number" name="post_fev1_pp" required>
+                    <label for="post_ratio">FEV1/FVC Ratio (%)</label>
+                    <input type="number" name="post_ratio" required>
+                </fieldset>
+            </div>
+            
+            <div class="form-buttons">
+                <button type="submit">Generate Report <span id="loading-spinner" class="htmx-indicator" aria-busy="true"></span></button>
+                <button id="clear-form-btn" type="button" class="secondary">Clear Form</button>
+            </div>
+        </form>
+
+        <div id="results-container">
+            <p>Your report will be generated here.</p>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const pftForm = document.getElementById('pft-form');
+            const clearButton = document.getElementById('clear-form-btn');
+            const storageKey = 'pftFormData';
+
+            const saveFormData = () => {
+                const formData = new FormData(pftForm);
+                const dataObject = Object.fromEntries(formData.entries());
+                localStorage.setItem(storageKey, JSON.stringify(dataObject));
+            };
+
+            const loadFormData = () => {
+                const savedData = localStorage.getItem(storageKey);
+                if (savedData) {
+                    const dataObject = JSON.parse(savedData);
+                    for (const key in dataObject) {
+                        if (pftForm.elements[key]) { pftForm.elements[key].value = dataObject[key]; }
+                    }
+                }
+            };
+            
+            const clearFormData = () => {
+                localStorage.removeItem(storageKey);
+                pftForm.reset();
+                document.getElementById('results-container').innerHTML = '<p>Your report will be generated here.</p>';
+            };
+
+            pftForm.addEventListener('input', saveFormData);
+            pftForm.addEventListener('submit', saveFormData);
+            clearButton.addEventListener('click', clearFormData);
+            loadFormData();
+        });
+
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            const exportBtn = document.getElementById('export-pdf-btn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', () => {
+                    const reportElement = document.getElementById('full-report');
+                    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+                    
+                    const options = {
+                        margin:       0.5,
+                        filename:     `PFT_Report_${timestamp}.pdf`,
+                        image:        { type: 'jpeg', quality: 0.98 },
+                        html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+                        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+                        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+                    };
+
+                    html2pdf().from(reportElement).set(options).save();
+                });
+            }
+        });
+    </script>
+</body>
+</html>
