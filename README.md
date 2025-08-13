@@ -106,8 +106,8 @@ A significant response (i.e., reversibility) is defined as an increase of > 12% 
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/PFT-test.git
-   cd PFT-test
+   git clone https://github.com/ElvisAkpene/AFT-challenge.git
+   cd AFT-challenge
    ```
 
 2. **Create and activate a virtual environment (recommended)**:
@@ -238,7 +238,7 @@ Top 5 Mismatches for Review:
 ## 📂 Project Structure
 
 ```
-PFT-test/
+AFT-challenge/
 ├── api/
 │   └── api_server.py           # FastAPI server for the web interface
 ├── modules/
