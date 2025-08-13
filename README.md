@@ -1,217 +1,360 @@
 
-# **PFT Automated Interpretation System**
+PFT Automated Interpretation System
 
----
 
-## ⚠️ Medical Disclaimer
+A comprehensive tool for the automated preliminary interpretation of Pulmonary Function Tests (PFTs). This system uses the Global Lung Function Initiative (GLI-2012) reference equations to analyze spirometry data, determine ventilatory patterns (Normal, Obstructive, Restrictive, Mixed), assess severity, and generate detailed clinical reports.
 
-This software is a **proof-of-concept** and generates **preliminary, computer-assisted interpretations** of Pulmonary Function Tests (PFTs).
-It **does not replace** professional medical judgment.
-All final interpretations must be performed by a **qualified physician**, considering the patient’s full clinical picture.
-The authors assume **no liability** for clinical decisions based on this tool.
+⚠️ Medical Disclaimer
 
----
+This is a preliminary report and a proof-of-concept tool. It is not a substitute for professional medical advice, diagnosis, or treatment. Final interpretation of any PFT data must be performed by a qualified physician who can correlate the findings with the patient's full clinical context. The authors of this software assume no liability for any decisions made based on its output.
 
-## ✨ Key Features
+✨ Key Features
 
-* **GLI-2012 Compliant**
-  Uses the Global Lung Function Initiative (GLI-2012) all-age, multi-ethnic reference equations to calculate predicted values and Z-scores.
+GLI-2012 Compliant: Implements the modern, all-age, multi-ethnic GLI-2012 reference equations for calculating predicted values and Z-scores.
 
-* **Comprehensive Interpretation**
+Comprehensive Interpretation:
 
-  * Determines ventilatory patterns: **Normal**, **Obstructive**, **Restrictive**, **Mixed**.
-  * Classifies severity: Mild → Very Severe.
-  * Evaluates bronchodilator response and reversibility.
+Determines ventilatory pattern: Normal, Obstructive, Restrictive, or Mixed.
 
-* **Detailed Reporting**
+Classifies severity: Mild, Moderate, Moderately Severe, Severe, Very Severe.
 
-  * Generates **JSON reports** with patient data, results, interpretation, and recommendations.
-  * Produces **human-readable summaries** in plain text.
+Assesses bronchodilator response and reversibility based on ATS/ERS criteria.
 
-* **Multiple Interfaces**
+Detailed Reporting:
 
-  * **Web UI**: Interactive FastAPI + HTMX form for single-patient interpretation and PDF report generation.
-  * **CLI**: Batch processing, dataset interpretation, and quality assessments.
+Generates comprehensive JSON reports with patient data, results, interpretation, clinical impressions, and multi-faceted recommendations.
 
-* **Validation & Quality Checks**
+Provides concise, human-readable summary reports in plain text.
 
-  * Framework for comparing interpretations to expert-labelled datasets.
-  * Built-in data plausibility checks (e.g., FEV1 > FVC, missing values).
+Multiple Interfaces:
 
----
+Web UI: An interactive web-based form for single-patient interpretation and PDF report generation (powered by FastAPI and HTMX).
 
-## 🧠 Core Interpretation Logic — GLI-2012 Standard
+Command-Line Interface (CLI): A powerful CLI for processing single files, batch processing entire datasets (JSON/JSONL), and running data quality assessments.
 
-This tool follows **ERS/ATS Task Force** recommendations and implements GLI-2012 equations from:
-*Quanjer PH et al., Eur Respir J. 2012;40(6):1324–1343*
+Validation Framework: Includes a validation script to compare system interpretations against expert-labeled data, ensuring accuracy and facilitating model tuning.
 
-### 1. Predicted Values
+Data Quality Analysis: Built-in validation checks for biological plausibility (e.g., FEV1 > FVC) and data completeness.
 
-Predicted FEV1 and FVC are calculated using:
+🧠 Core Interpretation Logic: The GLI-2012 Standard
 
-```
-ln(Predicted) = Intercept + β₁·ln(Height) + β₂·ln(Age) + Spline(Age)
-Predicted     = exp(ln(Predicted))
-```
+This system's logic is grounded in the recommendations of the ERS/ATS Task Force and uses the GLI-2012 equations, as detailed in Quanjer PH, et al. Eur Respir J. 2012;40(6):1324-43. The key departure from older methods is the move from fixed percentages (e.g., FEV1/FVC < 70%) to a statistically robust Z-score system.
 
-* **Height & Age**: Logged for regression.
-* **Spline(Age)**: Non-linear age adjustments from GLI-2012.
-* **Coefficients**: Current version uses Caucasian dataset.
+1. Predicted Value Calculation
 
----
+Predicted values for FEV1 and FVC are calculated using a complex regression model that accounts for age, height, and sex. The core of the model is a log-log relationship with an age-dependent spline function to capture non-linear growth and decline.
 
-### 2. Z-Score Calculation
+The general form of the equation is:
 
-```
-Z = (Measured − Predicted) / (Predicted × CV)
-```
+code
+Code
+download
+content_copy
+expand_less
 
-* **CV** (Coefficient of Variation) models SD changes with age.
-* **LLN** (Lower Limit of Normal) = Z-score ≤ -1.645 (\~5th percentile).
+ln(Predicted_Value) = Intercept + β₁ * ln(Height) + β₂ * ln(Age) + Spline(Age)
 
----
+or
 
-### 3. Pattern Determination
+code
+Code
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+Predicted_Value = exp( Intercept + β₁ * ln(Height) + β₂ * ln(Age) + Spline(Age) )
 
-* **Obstruction**: FEV1/FVC Z-score < -1.645
-* **Restriction**: FVC Z-score < -1.645
-* Decision tree classifies: Obstructive, Restrictive, Mixed, Normal.
+ln: Natural logarithm.
 
----
+Coefficients (Intercept, β₁, β₂): These are specific to the parameter (FEV1, FVC), sex, and ethnicity. The current implementation uses the Caucasian dataset from the GLI-2012 paper.
 
-### 4. Severity Classification (FEV1 % Predicted)
+Spline(Age): This is a crucial, non-linear function that adjusts the prediction across the entire lifespan (from age 3 to 95). It corrects for the rapid changes during childhood, adolescence, and aging that a simple linear model cannot capture. The implementation (_calculate_spline) uses a simplified piecewise function to approximate the GLI spline.
 
-| Pattern     | Severity Cutoffs                                            |
-| ----------- | ----------------------------------------------------------- |
-| Obstructive | ≥80% Mild, 50–79% Moderate, 30–49% Mod. Severe, <30% Severe |
-| Restrictive | ≥70% Mild, 60–69% Moderate, 50–59% Mod. Severe, <50% Severe |
-| Mixed       | ≥60% Moderate, 40–59% Mod. Severe, <40% Severe              |
+2. Z-Score Calculation (The Heart of GLI)
 
----
+The Z-score (or standard deviation score) measures how many standard deviations an observation is from the predicted mean. It is the modern standard for interpretation.
 
-### 5. Bronchodilator Response
+The standard deviation (SD) itself varies with age. The GLI model uses another set of equations to model this changing variability, expressed as the Coefficient of Variation (CV). The Z-score is calculated as:
 
-Significant if:
+code
+Python
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+# From PFT_interpreter.py
+z_score = (measured_value - predicted_value) / (predicted_value * coefficient_of_variation)
 
-* ΔFEV1 or ΔFVC > **12%** *and* > **200 mL** (post vs pre).
+A Z-score of -1.645 corresponds to the 5th percentile, which is the Lower Limit of Normal (LLN). Any value below this is considered statistically abnormal.
 
----
+3. Pattern Determination
 
-## 🛠 Installation
+The interpretation flow follows a decision tree based on Z-scores, as recommended by ATS/ERS guidelines.
 
-**Requirements**: Python 3.8+
+Check for Obstruction: Is the FEV1/FVC Z-score < -1.645?
 
-```bash
-git clone <repository_url>
+YES: An obstructive component is present.
+
+Then, check for restriction: Is the FVC Z-score < -1.645?
+
+YES: The pattern is MIXED.
+
+NO: The pattern is OBSTRUCTIVE.
+
+NO: No obstructive component.
+
+Then, check for restriction: Is the FVC Z-score < -1.645?
+
+YES: The pattern is RESTRICTIVE.
+
+NO: The pattern is NORMAL.
+
+4. Severity Classification
+
+Severity is primarily based on the FEV1 % Predicted. The thresholds vary slightly by pattern to align with common clinical guidelines.
+
+Pattern	FEV1 % Predicted	Severity
+Obstructive	>= 80%	Mild
+	50% - 79%	Moderate
+	30% - 49%	Moderately Severe
+	< 30%	Severe
+Restrictive	>= 70%	Mild
+	60% - 69%	Moderate
+	50% - 59%	Moderately Severe
+	< 50%	Severe
+Mixed	>= 60%	Moderate
+	40% - 59%	Moderately Severe
+	< 40%	Severe
+5. Bronchodilator Response
+
+A significant response (i.e., reversibility) is defined as an increase of > 12% AND > 200 mL in either FEV1 or FVC from pre- to post-bronchodilator values.
+
+🛠️ Installation
+
+Prerequisites: Python 3.8+
+
+Clone the repository:
+
+code
+Bash
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+git clone https://github.com/your-username/PFT-test.git
 cd PFT-test
+
+Create and activate a virtual environment (recommended):
+
+code
+Bash
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
 python -m venv venv
-# Activate
-# Windows:
+# On Windows
 venv\Scripts\activate
-# Mac/Linux:
+# On macOS/Linux
 source venv/bin/activate
+
+Install dependencies:
+(A requirements.txt should be created. Based on the code, these are the core dependencies.)
+
+code
+Bash
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
 pip install fastapi "uvicorn[standard]" jinja2
-```
+🚀 Usage
+1. Web Interface
 
----
+The most user-friendly way to interact with the system for single interpretations.
 
-## 🚀 Usage
+Start the server:
 
-### 1. Web Interface
-
-```bash
+code
+Bash
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
 uvicorn api.api_server:app --reload --host 0.0.0.0 --port 8080
-```
 
-* Visit: `http://localhost:8080`
-* Fill form → Generate Report → Export as PDF.
+Open your browser and navigate to http://localhost:8080.
 
----
+Fill out the form with patient and spirometry data.
 
-### 2. Command-Line Interface
+Click "Generate Report". The results will appear on the page.
 
-**Syntax**:
+You can export the generated report as a PDF.
 
-```bash
-python -m modules.PFT_main <command> --input <file> [options]
-```
+2. Command-Line Interface (CLI)
 
-**Commands**:
+The CLI (modules/PFT_main.py) is ideal for batch processing or integration into automated workflows.
 
-* `single` → Interpret one JSON record
-* `batch` → Interpret JSON/JSONL dataset
-* `quality` → Run plausibility checks only
+General Syntax:
+python -m modules.PFT_main <command> --input <file_path> [options]
 
-Example:
+Commands:
 
-```bash
-python -m modules.PFT_main single -i sample.json -o output/
+single: Process a single PFT record from a JSON file.
+
+code
+Bash
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+# Generate a comprehensive JSON report
+python -m modules.PFT_main single -i path/to/sample.json -o output/
+
+# Generate a summary text report
+python -m modules.PFT_main single -i path/to/sample.json -o output/ --format text
+
+batch: Process a list of PFT records from a JSON or JSONL file.
+
+code
+Bash
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+# Process a batch file, generating JSON reports for each record
 python -m modules.PFT_main batch -i PFT-data/PFT_data.json -o batch_output/ --format json
-```
 
----
+This will create an output directory containing individual reports and a batch_summary.json with aggregate statistics.
 
-## 📄 Input Data Format (JSON)
+quality: Run a data quality assessment on a batch file without full interpretation.
 
-```json
+code
+Bash
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+python -m modules.PFT_main quality -i PFT-data/PFT_data.json -o quality_reports/
+
+This generates a quality_assessment.json detailing valid/invalid records and specific validation errors.
+
+Input Data Format
+
+The system expects input data in a specific JSON structure. Here is an example:
+
+code
+JSON
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
 {
     "file_name": "sample_pft.pdf",
-    "demographics": { "age": 65, "sex": "M", "height_cm": 175.0, "weight_kg": 88.0 },
+    "demographics": {
+        "age": 65,
+        "sex": "M",
+        "height_cm": 175.0,
+        "weight_kg": 88.0
+    },
     "pft_results": {
         "pre_bronchodilator": {
-            "fvc": { "liters": 3.95, "percent_predicted": 98 },
-            "fev1": { "liters": 2.53, "percent_predicted": 78 },
-            "fev1_fvc_ratio": { "value": 64 }
+            "fvc": {"liters": 3.95, "percent_predicted": 98},
+            "fev1": {"liters": 2.53, "percent_predicted": 78},
+            "fev1_fvc_ratio": {"value": 64}
         },
         "post_bronchodilator": {
-            "fvc": { "liters": 4.15, "percent_predicted": 103 },
-            "fev1": { "liters": 2.91, "percent_predicted": 90 },
-            "fev1_fvc_ratio": { "value": 70 }
+            "fvc": {"liters": 4.15, "percent_predicted": 103},
+            "fev1": {"liters": 2.91, "percent_predicted": 90},
+            "fev1_fvc_ratio": {"value": 70}
         }
     }
 }
-```
+🔬 Validation
 
----
+The project includes a validation script to measure the system's accuracy against a ground-truth dataset.
 
-## 🔬 Validation
+Dataset: The validation script expects a JSON file (PFT-data/PFT_data.json) where each record contains an impression field with the expert's text-based interpretation.
 
-Run:
+Execution:
 
-```bash
+code
+Bash
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
 python -m validation.validate_system
-```
 
-Outputs: Pattern & Severity accuracy vs expert interpretation.
+Output: The script will print a report comparing the system's Pattern and Severity classification against the parsed expert impression, providing accuracy percentages and a list of mismatches.
 
----
+code
+Code
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+==================================================
+      PFT SYSTEM VALIDATION REPORT
+==================================================
+Total Records Processed: 13
 
-## 📂 Project Structure
+--- ACCURACY METRICS ---
+Pattern Identification Accuracy:  92.31% (12/13)
+Severity Classification Accuracy: 84.62% (11/13)
+Overall Agreement (Pattern & Severity): 84.62% (11/13)
 
-```
+--- MISMATCH ANALYSIS ---
+Found 2 records with disagreements.
+Top 5 Mismatches for Review:
+...
+📂 Project Structure
+code
+Code
+download
+content_copy
+expand_less
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
 PFT-test/
-├── api/                # FastAPI server
-├── modules/            # Core logic & CLI
-├── templates/          # HTML templates
-├── validation/         # Validation scripts
-├── PFT-data/           # Sample datasets
-└── ...
-```
+├── api/
+│   └── api_server.py           # FastAPI server for the web interface
+├── modules/
+│   ├── PFT_interpreter.py      # Core logic for GLI calculations and interpretation
+│   ├── PFT_main.py             # Main entry point for CLI, batch processing
+│   └── PFT_report.py           # Report generation logic
+├── templates/
+│   ├── index.html              # Main HTML page for the web UI
+│   └── results_partial.html    # Jinja2 template for displaying results via HTMX
+├── validation/
+│   └── validate_system.py      # Script to validate system accuracy against a dataset
+├── PFT-data/
+│   └── PFT_data.json           # Sample dataset for validation and batch testing
+└── ... (other project files)
+📈 Future Improvements
 
----
+Expand GLI Ethnicities: Implement coefficients for other ethnic groups (e.g., African-American, North/South East Asian) as defined in the GLI-2012 data.
 
-## 📈 Future Improvements
+Add More PFT Parameters: Extend the interpretation to include Lung Volumes (TLC, RV) and Diffusing Capacity (DLCO) for a more complete picture of restrictive diseases.
 
-* Multi-ethnic GLI implementation.
-* Add Lung Volumes (TLC, RV) & DLCO.
-* Configurable thresholds & GLI coefficients.
-* Unit & integration test suite.
-* Docker container for deployment.
+Unit & Integration Testing: Develop a robust test suite using a framework like pytest to ensure the reliability of individual functions and the system as a whole.
 
----
+Configuration File: Externalize settings like GLI coefficients and severity thresholds into a configuration file (e.g., config.yaml) for easier tuning.
 
-## 📜 License
+Containerization: Provide a Dockerfile to make deployment easier and more consistent across different environments.
 
-MIT License — see `LICENSE` file.
+📜 License
 
----
+This project is licensed under the MIT License. See the LICENSE file for details.
